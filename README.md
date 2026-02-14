@@ -20,6 +20,7 @@ While FileCommander handles filesystem operations, CodeCommander focuses on **co
 - **Encoding Fix** - Repair Mojibake and double-encoded UTF-8 (27+ patterns)
 - **Umlaut Repair** - Fix broken German characters (70+ patterns)
 - **Format Conversion** - Convert between JSON, CSV, and INI
+- **Markdown Export** - Convert Markdown to professional HTML/PDF with code blocks, tables, nested lists, blockquotes
 - **Cross-platform** - Works on Windows, macOS, and Linux
 
 ---
@@ -149,7 +150,7 @@ FileCommander and CodeCommander are designed to work side by side:
 
 | Tool | Description |
 |------|-------------|
-| `cc_md_to_pdf` | Convert Markdown to styled HTML (printable as PDF) |
+| `cc_md_to_pdf` | Markdown to HTML: headers, code blocks, tables, nested lists, blockquotes, images, checkboxes |
 
 **Total: 14 tools**
 
@@ -157,7 +158,7 @@ FileCommander and CodeCommander are designed to work side by side:
 
 ## Shared Tools
 
-5 tools exist in both FileCommander and CodeCommander for convenience:
+6 tools exist in both FileCommander and CodeCommander for convenience:
 
 | FileCommander | CodeCommander | Function |
 |---------------|---------------|----------|
@@ -166,6 +167,7 @@ FileCommander and CodeCommander are designed to work side by side:
 | `fc_fix_encoding` | `cc_fix_encoding` | Encoding repair |
 | `fc_cleanup_file` | `cc_cleanup_file` | File cleanup |
 | `fc_convert_format` | `cc_convert_format` | Format conversion |
+| `fc_md_to_html` | `cc_md_to_pdf` | Markdown to HTML export |
 
 ---
 
