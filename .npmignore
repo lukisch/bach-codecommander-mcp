@@ -1,0 +1,6 @@
+src/
+tsconfig.json
+.gitignore
+.claude/
+.idea/
+.vscode/
