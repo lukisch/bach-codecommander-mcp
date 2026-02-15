@@ -9,7 +9,7 @@
  * See LICENSE file for details.
  *
  * @author Lukas (BACH)
- * @version 1.0.0
+ * @version 1.1.0
  * @license MIT
  */
 
@@ -20,6 +20,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { t, setLanguage } from './i18n/index.js';
 
 const execAsync = promisify(exec);
 
@@ -29,7 +30,7 @@ const execAsync = promisify(exec);
 
 const server = new McpServer({
   name: "bach-codecommander-mcp",
-  version: "1.0.1"
+  version: "1.1.0"
 });
 
 // ============================================================================
@@ -282,16 +283,16 @@ function analyzePythonCode(content: string): CodeAnalysis {
 server.registerTool(
   "cc_analyze_code",
   {
-    title: "Code analysieren",
-    description: `Analysiert eine Python-Datei: Klassen, Funktionen, Imports, Metriken.
+    title: "Analyze Code",
+    description: `Analyzes a Python file: classes, functions, imports, metrics.
 
 Args:
-  - path (string): Pfad zur Python-Datei
+  - path (string): Path to the Python file
 
 Returns:
-  - Klassen mit Methoden, Funktionen, Import-Analyse, LOC, Komplexitaet`,
+  - Classes with methods, functions, import analysis, LOC, complexity`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur Python-Datei")
+      path: z.string().min(1).describe("Path to the Python file")
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -299,7 +300,7 @@ Returns:
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const content = await fs.readFile(filePath, "utf-8");
@@ -307,34 +308,34 @@ Returns:
       const stats = await fs.stat(filePath);
 
       const output = [
-        `\uD83D\uDD0D **Code-Analyse: ${path.basename(filePath)}**`, '',
-        `| Metrik | Wert |`, `|---|---|`,
-        `| Zeilen gesamt | ${analysis.totalLines} |`,
-        `| Code-Zeilen | ${analysis.codeLines} |`,
-        `| Kommentar-Zeilen | ${analysis.commentLines} |`,
-        `| Leerzeilen | ${analysis.blankLines} |`,
-        `| Klassen | ${analysis.classes.length} |`,
-        `| Funktionen | ${analysis.functions.length} |`,
-        `| Imports | ${analysis.imports.length} |`,
-        `| Zyklomatische Komplexitaet | ${analysis.complexity} |`,
-        `| Dateigroesse | ${formatFileSize(stats.size)} |`
+        t().cc_analyze_code.header(path.basename(filePath)), '',
+        `| ${t().cc_analyze_code.metricTotalLines} | ${analysis.totalLines} |`, `|---|---|`,
+        `| ${t().cc_analyze_code.metricTotalLines} | ${analysis.totalLines} |`,
+        `| ${t().cc_analyze_code.metricCodeLines} | ${analysis.codeLines} |`,
+        `| ${t().cc_analyze_code.metricCommentLines} | ${analysis.commentLines} |`,
+        `| ${t().cc_analyze_code.metricBlankLines} | ${analysis.blankLines} |`,
+        `| ${t().cc_analyze_code.metricClasses} | ${analysis.classes.length} |`,
+        `| ${t().cc_analyze_code.metricFunctions} | ${analysis.functions.length} |`,
+        `| ${t().cc_analyze_code.metricImports} | ${analysis.imports.length} |`,
+        `| ${t().cc_analyze_code.metricCyclomaticComplexity} | ${analysis.complexity} |`,
+        `| ${t().cc_analyze_code.metricFileSize} | ${formatFileSize(stats.size)} |`
       ];
 
       if (analysis.classes.length > 0) {
-        output.push('', '**Klassen:**');
+        output.push('', t().cc_analyze_code.classesHeader);
         for (const cls of analysis.classes) {
           const bases = cls.bases.length > 0 ? `(${cls.bases.join(', ')})` : '';
-          output.push(`  \uD83D\uDCE6 **${cls.name}${bases}** (Z.${cls.startLine}-${cls.endLine}, ${cls.methods.length} Methoden)`);
+          output.push(t().cc_analyze_code.classInfo(cls.name, bases, cls.startLine, cls.endLine, cls.methods.length));
           if (cls.docstring) output.push(`    _${cls.docstring}_`);
-          if (cls.methods.length > 0) output.push(`    Methoden: ${cls.methods.join(', ')}`);
+          if (cls.methods.length > 0) output.push(t().cc_analyze_code.classMethods(cls.methods.join(', ')));
         }
       }
 
       if (analysis.functions.length > 0) {
-        output.push('', '**Funktionen:**');
+        output.push('', t().cc_analyze_code.functionsHeader);
         for (const func of analysis.functions) {
           const async_prefix = func.isAsync ? 'async ' : '';
-          output.push(`  \u2699\uFE0F ${async_prefix}**${func.name}**(${func.params}) (Z.${func.startLine}-${func.endLine})`);
+          output.push(t().cc_analyze_code.functionInfo(async_prefix, func.name, func.params, func.startLine, func.endLine));
           if (func.docstring) output.push(`    _${func.docstring}_`);
         }
       }
@@ -343,15 +344,15 @@ Returns:
         const stdlib = analysis.imports.filter(i => i.type === 'stdlib');
         const thirdParty = analysis.imports.filter(i => i.type === 'third_party');
         const local = analysis.imports.filter(i => i.type === 'local');
-        output.push('', `**Imports:** ${stdlib.length} stdlib, ${thirdParty.length} third-party, ${local.length} lokal`);
+        output.push('', t().cc_analyze_code.importsHeader(stdlib.length, thirdParty.length, local.length));
         if (thirdParty.length > 0) {
-          output.push(`  Third-party: ${thirdParty.map(i => i.module).join(', ')}`);
+          output.push(t().cc_analyze_code.thirdPartyList(thirdParty.map(i => i.module).join(', ')));
         }
       }
 
       return { content: [{ type: "text", text: output.join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -363,18 +364,18 @@ Returns:
 server.registerTool(
   "cc_analyze_methods",
   {
-    title: "Methoden analysieren",
-    description: `Detaillierte Methoden-Analyse einer Python-Datei.
+    title: "Analyze Methods",
+    description: `Detailed method analysis of a Python file.
 
 Args:
-  - path (string): Pfad zur Python-Datei
-  - class_name (string, optional): Nur Methoden dieser Klasse
+  - path (string): Path to the Python file
+  - class_name (string, optional): Only methods of this class
 
 Returns:
-  - Methoden mit Parametern, Dekoratoren, Komplexitaet, Datenfluss`,
+  - Methods with parameters, decorators, complexity, data flow`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur Python-Datei"),
-      class_name: z.string().optional().describe("Nur diese Klasse analysieren")
+      path: z.string().min(1).describe("Path to the Python file"),
+      class_name: z.string().optional().describe("Only analyze this class")
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -382,26 +383,26 @@ Returns:
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const content = await fs.readFile(filePath, "utf-8");
       const lines = content.split('\n');
       const analysis = analyzePythonCode(content);
 
-      const output = [`\uD83D\uDD0D **Methoden-Analyse: ${path.basename(filePath)}**`, ''];
+      const output = [t().cc_analyze_methods.header(path.basename(filePath)), ''];
 
       const targetClasses = params.class_name
         ? analysis.classes.filter(c => c.name === params.class_name)
         : analysis.classes;
 
       if (targetClasses.length === 0 && params.class_name) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Klasse "${params.class_name}" nicht gefunden. Verfuegbar: ${analysis.classes.map(c => c.name).join(', ')}` }] };
+        return { isError: true, content: [{ type: "text", text: t().cc_analyze_methods.classNotFound(params.class_name, analysis.classes.map(c => c.name).join(', ')) }] };
       }
 
       for (const cls of targetClasses) {
         output.push(`## ${cls.name}`);
-        if (cls.bases.length > 0) output.push(`Erbt von: ${cls.bases.join(', ')}`);
+        if (cls.bases.length > 0) output.push(t().cc_analyze_methods.inheritsFrom(cls.bases.join(', ')));
         output.push('');
 
         // Analyze each method
@@ -446,26 +447,26 @@ Returns:
 
           output.push(`### ${isAsync ? 'async ' : ''}${methodName}(${params_str})`);
           if (returnType) output.push(`  Return: ${returnType}`);
-          output.push(`  Sichtbarkeit: ${visibility} | Komplexitaet: ${methodComplexity}`);
-          if (decorators.length > 0) output.push(`  Dekoratoren: ${decorators.join(', ')}`);
-          if (selfCalls.length > 0) output.push(`  Ruft auf: ${selfCalls.join(', ')}`);
+          output.push(t().cc_analyze_methods.visibilityLabel(visibility, methodComplexity));
+          if (decorators.length > 0) output.push(t().cc_analyze_methods.decorators(decorators.join(', ')));
+          if (selfCalls.length > 0) output.push(t().cc_analyze_methods.calls(selfCalls.join(', ')));
           output.push('');
         }
       }
 
       // Also show top-level functions
       if (!params.class_name && analysis.functions.length > 0) {
-        output.push('## Top-Level Funktionen', '');
+        output.push(t().cc_analyze_methods.topLevelFunctions, '');
         for (const func of analysis.functions) {
           output.push(`### ${func.isAsync ? 'async ' : ''}${func.name}(${func.params})`);
-          if (func.decorators.length > 0) output.push(`  Dekoratoren: ${func.decorators.join(', ')}`);
+          if (func.decorators.length > 0) output.push(t().cc_analyze_methods.decorators(func.decorators.join(', ')));
           output.push('');
         }
       }
 
       return { content: [{ type: "text", text: output.join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -477,17 +478,17 @@ Returns:
 server.registerTool(
   "cc_extract_classes",
   {
-    title: "Klassen extrahieren",
-    description: `Extrahiert Python-Klassen und Funktionen aus einer Datei als separate Textbloecke.
+    title: "Extract Classes",
+    description: `Extracts Python classes and functions from a file as separate text blocks.
 
 Args:
-  - path (string): Pfad zur Python-Datei
-  - output_dir (string, optional): Ausgabeverzeichnis (sonst nur Anzeige)
+  - path (string): Path to the Python file
+  - output_dir (string, optional): Output directory (otherwise display only)
 
-Nützlich fuer Code-Review und Dokumentation.`,
+Useful for code review and documentation.`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur Python-Datei"),
-      output_dir: z.string().optional().describe("Ausgabeverzeichnis")
+      path: z.string().min(1).describe("Path to the Python file"),
+      output_dir: z.string().optional().describe("Output directory")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -495,21 +496,21 @@ Nützlich fuer Code-Review und Dokumentation.`,
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const content = await fs.readFile(filePath, "utf-8");
       const lines = content.split('\n');
       const analysis = analyzePythonCode(content);
 
-      const output: string[] = [`\uD83D\uDD0D **Klassen-Extraktion: ${path.basename(filePath)}**`, ''];
+      const output: string[] = [t().cc_extract_classes.header(path.basename(filePath)), ''];
 
       const extractedFiles: { name: string; content: string }[] = [];
 
       for (const cls of analysis.classes) {
         const classContent = lines.slice(cls.startLine - 1, cls.endLine).join('\n');
         extractedFiles.push({ name: `${cls.name}.txt`, content: classContent });
-        output.push(`\uD83D\uDCE6 **${cls.name}** (${cls.endLine - cls.startLine + 1} Zeilen, ${cls.methods.length} Methoden)`);
+        output.push(t().cc_extract_classes.classInfo(cls.name, cls.endLine - cls.startLine + 1, cls.methods.length));
       }
 
       // Collect top-level code (imports, functions, globals)
@@ -519,8 +520,8 @@ Nützlich fuer Code-Review und Dokumentation.`,
         if (!isInClass) topLevelLines.push(lines[i]);
       }
       if (topLevelLines.some(l => l.trim() !== '')) {
-        extractedFiles.push({ name: 'Hilfsfunktionen.txt', content: topLevelLines.join('\n') });
-        output.push(`\u2699\uFE0F **Hilfsfunktionen** (${topLevelLines.filter(l => l.trim() !== '').length} Zeilen)`);
+        extractedFiles.push({ name: `${t().cc_extract_classes.helperFunctions}.txt`, content: topLevelLines.join('\n') });
+        output.push(t().cc_extract_classes.helperFunctionsInfo(topLevelLines.filter(l => l.trim() !== '').length));
       }
 
       if (params.output_dir) {
@@ -529,14 +530,14 @@ Nützlich fuer Code-Review und Dokumentation.`,
         for (const file of extractedFiles) {
           await fs.writeFile(path.join(outDir, file.name), file.content, 'utf-8');
         }
-        output.push('', `\u2705 ${extractedFiles.length} Dateien geschrieben nach: ${outDir}`);
+        output.push('', t().cc_extract_classes.filesWritten(extractedFiles.length, outDir));
       } else {
-        output.push('', `\uD83D\uDCA1 Nutze output_dir um die Extrakte als Dateien zu speichern.`);
+        output.push('', t().cc_extract_classes.hintUseOutputDir);
       }
 
       return { content: [{ type: "text", text: output.join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -548,17 +549,17 @@ Nützlich fuer Code-Review und Dokumentation.`,
 server.registerTool(
   "cc_organize_imports",
   {
-    title: "Imports organisieren",
-    description: `Organisiert Python-Imports nach PEP 8: sortiert, dedupliziert, gruppiert.
+    title: "Organize Imports",
+    description: `Organizes Python imports per PEP 8: sorted, deduplicated, grouped.
 
 Args:
-  - path (string): Pfad zur Python-Datei
-  - dry_run (boolean): Nur Vorschau
+  - path (string): Path to the Python file
+  - dry_run (boolean): Preview only
 
-Gruppen: 1) __future__ 2) stdlib 3) third-party 4) lokal`,
+Groups: 1) __future__ 2) stdlib 3) third-party 4) local`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur Python-Datei"),
-      dry_run: z.boolean().default(false).describe("Nur Vorschau")
+      path: z.string().min(1).describe("Path to the Python file"),
+      dry_run: z.boolean().default(false).describe("Preview only")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -566,7 +567,7 @@ Gruppen: 1) __future__ 2) stdlib 3) third-party 4) lokal`,
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const content = await fs.readFile(filePath, "utf-8");
@@ -591,7 +592,7 @@ Gruppen: 1) __future__ 2) stdlib 3) third-party 4) lokal`,
       }
 
       if (importLines.length === 0) {
-        return { content: [{ type: "text", text: `\uD83D\uDD0D Keine Imports in ${path.basename(filePath)} gefunden.` }] };
+        return { content: [{ type: "text", text: t().cc_organize_imports.noImportsFound(path.basename(filePath)) }] };
       }
 
       // Deduplicate
@@ -627,17 +628,17 @@ Gruppen: 1) __future__ 2) stdlib 3) third-party 4) lokal`,
       }
 
       const output = [
-        `\uD83D\uDD0D **Import-Analyse: ${path.basename(filePath)}**`, '',
-        `| Kategorie | Anzahl |`, `|---|---|`,
-        `| __future__ | ${futureImports.length} |`,
-        `| stdlib | ${stdlibImports.length} |`,
-        `| third-party | ${thirdPartyImports.length} |`,
-        `| lokal | ${localImports.length} |`,
-        `| Duplikate entfernt | ${removed} |`
+        t().cc_organize_imports.header(path.basename(filePath)), '',
+        `| ${t().cc_organize_imports.categoryFuture} | ${futureImports.length} |`, `|---|---|`,
+        `| ${t().cc_organize_imports.categoryFuture} | ${futureImports.length} |`,
+        `| ${t().cc_organize_imports.categoryStdlib} | ${stdlibImports.length} |`,
+        `| ${t().cc_organize_imports.categoryThirdParty} | ${thirdPartyImports.length} |`,
+        `| ${t().cc_organize_imports.categoryLocal} | ${localImports.length} |`,
+        `| ${t().cc_organize_imports.duplicatesRemoved} | ${removed} |`
       ];
 
       if (params.dry_run) {
-        output.push('', '**Vorschau (sortiert & gruppiert):**', '```python', ...newImportBlock, '```');
+        output.push('', t().cc_organize_imports.previewHeader, '```python', ...newImportBlock, '```');
         return { content: [{ type: "text", text: output.join('\n') }] };
       }
 
@@ -648,11 +649,11 @@ Gruppen: 1) __future__ 2) stdlib 3) third-party 4) lokal`,
         ...lines.slice(importEnd + 1)
       ];
       await fs.writeFile(filePath, newLines.join('\n'), 'utf-8');
-      output.push('', `\u2705 Imports organisiert und gespeichert.`);
+      output.push('', t().cc_organize_imports.importsSaved);
 
       return { content: [{ type: "text", text: output.join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -664,15 +665,15 @@ Gruppen: 1) __future__ 2) stdlib 3) third-party 4) lokal`,
 server.registerTool(
   "cc_diagnose_imports",
   {
-    title: "Imports diagnostizieren",
-    description: `Diagnostiziert Import-Probleme: fehlende Module, Circular Imports, unbenutzte Imports.
+    title: "Diagnose Imports",
+    description: `Diagnoses import issues: missing modules, circular imports, unused imports.
 
 Args:
-  - path (string): Pfad zur Python-Datei
+  - path (string): Path to the Python file
 
-Erkennt: Fehlende Module, vermutete Circular Imports, Import-Probleme`,
+Detects: Missing modules, suspected circular imports, import issues`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur Python-Datei")
+      path: z.string().min(1).describe("Path to the Python file")
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -680,7 +681,7 @@ Erkennt: Fehlende Module, vermutete Circular Imports, Import-Probleme`,
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const content = await fs.readFile(filePath, "utf-8");
@@ -711,7 +712,7 @@ Erkennt: Fehlende Module, vermutete Circular Imports, Import-Probleme`,
           const restOfCode = lines.filter((_, i) => i !== imp.line - 1).join('\n');
           const namePattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`);
           if (!namePattern.test(restOfCode)) {
-            warnings.push(`Z.${imp.line}: \`${name}\` wird importiert aber nicht verwendet`);
+            warnings.push(t().cc_diagnose_imports.unusedImport(imp.line, name));
           }
         }
       }
@@ -721,7 +722,7 @@ Erkennt: Fehlende Module, vermutete Circular Imports, Import-Probleme`,
       const seen = new Set<string>();
       for (const text of importTexts) {
         if (seen.has(text)) {
-          issues.push(`Duplikat: \`${text}\``);
+          issues.push(t().cc_diagnose_imports.duplicateImport(text));
         }
         seen.add(text);
       }
@@ -729,7 +730,7 @@ Erkennt: Fehlende Module, vermutete Circular Imports, Import-Probleme`,
       // Check for relative imports that might cause circular dependencies
       const localImports = analysis.imports.filter(i => i.type === 'local');
       if (localImports.length > 0) {
-        warnings.push(`${localImports.length} relative Imports gefunden (potenzielle Circular-Import-Gefahr)`);
+        warnings.push(t().cc_diagnose_imports.relativeImportsWarning(localImports.length));
       }
 
       // Check import order
@@ -738,7 +739,7 @@ Erkennt: Fehlende Module, vermutete Circular Imports, Import-Probleme`,
         if (lastType && imp.type !== lastType) {
           if ((lastType === 'third_party' && imp.type === 'stdlib') ||
               (lastType === 'local' && imp.type !== 'local')) {
-            warnings.push(`Z.${imp.line}: Import-Reihenfolge nicht PEP 8 konform`);
+            warnings.push(t().cc_diagnose_imports.importOrderWarning(imp.line));
             break;
           }
         }
@@ -746,28 +747,28 @@ Erkennt: Fehlende Module, vermutete Circular Imports, Import-Probleme`,
       }
 
       const output = [
-        `\uD83D\uDD0D **Import-Diagnose: ${path.basename(filePath)}**`, '',
+        t().cc_diagnose_imports.header(path.basename(filePath)), '',
         `| | |`, `|---|---|`,
-        `| Imports gesamt | ${analysis.imports.length} |`,
-        `| Probleme | ${issues.length} |`,
-        `| Warnungen | ${warnings.length} |`
+        `| ${t().cc_diagnose_imports.totalImports} | ${analysis.imports.length} |`,
+        `| ${t().cc_diagnose_imports.issues} | ${issues.length} |`,
+        `| ${t().cc_diagnose_imports.warnings} | ${warnings.length} |`
       ];
 
       if (issues.length > 0) {
-        output.push('', '**Probleme:**', ...issues.map(i => `  \u274C ${i}`));
+        output.push('', t().cc_diagnose_imports.issuesHeader, ...issues.map(i => `  \u274C ${i}`));
       }
       if (warnings.length > 0) {
-        output.push('', '**Warnungen:**', ...warnings.map(w => `  \u26A0\uFE0F ${w}`));
+        output.push('', t().cc_diagnose_imports.warningsHeader, ...warnings.map(w => `  \u26A0\uFE0F ${w}`));
       }
       if (issues.length === 0 && warnings.length === 0) {
-        output.push('', '\u2705 Keine Import-Probleme gefunden.');
+        output.push('', t().cc_diagnose_imports.noIssues);
       }
 
-      output.push('', `\uD83D\uDCA1 Nutze \`cc_organize_imports\` zum automatischen Sortieren.`);
+      output.push('', t().cc_diagnose_imports.hintOrganize);
 
       return { content: [{ type: "text", text: output.join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -779,19 +780,19 @@ Erkennt: Fehlende Module, vermutete Circular Imports, Import-Probleme`,
 server.registerTool(
   "cc_fix_json",
   {
-    title: "JSON reparieren",
-    description: `Repariert haeufige JSON-Fehler automatisch.
+    title: "Fix JSON",
+    description: `Automatically repairs common JSON errors.
 
 Args:
-  - path (string): Pfad zur JSON-Datei
-  - dry_run (boolean): Nur Probleme anzeigen
-  - create_backup (boolean): Backup erstellen
+  - path (string): Path to the JSON file
+  - dry_run (boolean): Only show issues
+  - create_backup (boolean): Create backup
 
-Repariert: BOM, Trailing Commas, Single Quotes, Kommentare, NUL-Bytes`,
+Repairs: BOM, trailing commas, single quotes, comments, NUL bytes`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur JSON-Datei"),
-      dry_run: z.boolean().default(false).describe("Nur anzeigen"),
-      create_backup: z.boolean().default(true).describe("Backup erstellen")
+      path: z.string().min(1).describe("Path to the JSON file"),
+      dry_run: z.boolean().default(false).describe("Preview only"),
+      create_backup: z.boolean().default(true).describe("Create backup")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -799,49 +800,49 @@ Repariert: BOM, Trailing Commas, Single Quotes, Kommentare, NUL-Bytes`,
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const rawContent = await fs.readFile(filePath, "utf-8");
       const fixes: string[] = [];
       let content = rawContent;
 
-      if (content.charCodeAt(0) === 0xFEFF) { content = content.slice(1); fixes.push("BOM entfernt"); }
-      if (content.includes('\0')) { content = content.replace(/\0/g, ''); fixes.push("NUL-Bytes entfernt"); }
+      if (content.charCodeAt(0) === 0xFEFF) { content = content.slice(1); fixes.push(t().cc_fix_json.fixBomRemoved); }
+      if (content.includes('\0')) { content = content.replace(/\0/g, ''); fixes.push(t().cc_fix_json.fixNulRemoved); }
 
       const c1 = content; content = content.replace(/^(\s*)\/\/.*$/gm, '');
-      if (content !== c1) fixes.push("Kommentare entfernt");
+      if (content !== c1) fixes.push(t().cc_fix_json.fixCommentsRemoved);
 
       const c2 = content; content = content.replace(/\/\*[\s\S]*?\*\//g, '');
-      if (content !== c2) fixes.push("Block-Kommentare entfernt");
+      if (content !== c2) fixes.push(t().cc_fix_json.fixBlockCommentsRemoved);
 
       const c3 = content; content = content.replace(/,(\s*[}\]])/g, '$1');
-      if (content !== c3) fixes.push("Trailing Commas entfernt");
+      if (content !== c3) fixes.push(t().cc_fix_json.fixTrailingCommas);
 
       const c4 = content;
       content = content.replace(/(\s*)'([^'\\]*(?:\\.[^'\\]*)*)'\s*:/g, '$1"$2":');
       content = content.replace(/:\s*'([^'\\]*(?:\\.[^'\\]*)*)'/g, ': "$1"');
-      if (content !== c4) fixes.push("Single Quotes fixiert");
+      if (content !== c4) fixes.push(t().cc_fix_json.fixSingleQuotes);
 
       let isValid = false;
       let parseError = '';
       try { JSON.parse(content); isValid = true; } catch (e) { parseError = e instanceof Error ? e.message : String(e); }
 
       if (fixes.length === 0 && isValid) {
-        return { content: [{ type: "text", text: `\u2705 ${path.basename(filePath)} ist gueltiges JSON.` }] };
+        return { content: [{ type: "text", text: t().cc_fix_json.validJson(path.basename(filePath)) }] };
       }
 
       if (params.dry_run) {
-        return { content: [{ type: "text", text: [`\uD83D\uDD0D **JSON-Analyse: ${path.basename(filePath)}**`, '', ...fixes.map(f => `  - ${f}`), '', isValid ? '\u2705 Gueltig nach Reparatur' : `\u26A0\uFE0F Noch ungueltig: ${parseError}`].join('\n') }] };
+        return { content: [{ type: "text", text: [t().cc_fix_json.analysisHeader(path.basename(filePath)), '', ...fixes.map(f => `  - ${f}`), '', isValid ? t().cc_fix_json.validAfterRepair : t().cc_fix_json.stillInvalid(parseError)].join('\n') }] };
       }
 
       if (params.create_backup && fixes.length > 0) await fs.writeFile(filePath + '.bak', rawContent, "utf-8");
       if (isValid) content = JSON.stringify(JSON.parse(content), null, 2);
       await fs.writeFile(filePath, content, "utf-8");
 
-      return { content: [{ type: "text", text: [`\u2705 **JSON repariert: ${path.basename(filePath)}**`, '', ...fixes.map(f => `  - ${f}`), '', isValid ? '\u2705 Gueltig' : `\u26A0\uFE0F ${parseError}`].join('\n') }] };
+      return { content: [{ type: "text", text: [t().cc_fix_json.repairedHeader(path.basename(filePath)), '', ...fixes.map(f => `  - ${f}`), '', isValid ? '\u2705' : `\u26A0\uFE0F ${parseError}`].join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -853,13 +854,13 @@ Repariert: BOM, Trailing Commas, Single Quotes, Kommentare, NUL-Bytes`,
 server.registerTool(
   "cc_validate_json",
   {
-    title: "JSON validieren",
-    description: `Validiert JSON mit detaillierten Fehlerinformationen und Positionsangabe.
+    title: "Validate JSON",
+    description: `Validates JSON with detailed error information and position.
 
 Args:
-  - path (string): Pfad zur JSON-Datei`,
+  - path (string): Path to the JSON file`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur JSON-Datei")
+      path: z.string().min(1).describe("Path to the JSON file")
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -867,7 +868,7 @@ Args:
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const content = await fs.readFile(filePath, "utf-8");
@@ -875,9 +876,9 @@ Args:
 
       try {
         const parsed = JSON.parse(content);
-        const type = Array.isArray(parsed) ? `Array (${parsed.length} Elemente)` : typeof parsed === 'object' && parsed !== null ? `Objekt (${Object.keys(parsed).length} Schluessel)` : typeof parsed;
+        const type = Array.isArray(parsed) ? t().cc_validate_json.typeArray(parsed.length) : typeof parsed === 'object' && parsed !== null ? t().cc_validate_json.typeObject(Object.keys(parsed).length) : typeof parsed;
 
-        return { content: [{ type: "text", text: [`\u2705 **Gueltiges JSON: ${path.basename(filePath)}**`, '', `| | |`, `|---|---|`, `| Typ | ${type} |`, `| Groesse | ${formatFileSize(stats.size)} |`, `| BOM | ${content.charCodeAt(0) === 0xFEFF ? '\u26A0\uFE0F Ja' : 'Nein'} |`].join('\n') }] };
+        return { content: [{ type: "text", text: [t().cc_validate_json.validHeader(path.basename(filePath)), '', `| | |`, `|---|---|`, `| ${t().cc_validate_json.labelType} | ${type} |`, `| ${t().cc_validate_json.labelSize} | ${formatFileSize(stats.size)} |`, `| ${t().cc_validate_json.labelBom} | ${content.charCodeAt(0) === 0xFEFF ? t().cc_validate_json.bomYes : t().cc_validate_json.bomNo} |`].join('\n') }] };
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : String(e);
         const posMatch = errorMsg.match(/position\s+(\d+)/i);
@@ -889,12 +890,12 @@ Args:
           const col = pos - before.lastIndexOf('\n');
           const cLines = content.split('\n');
           const ctx = cLines.slice(Math.max(0, line - 3), line + 2);
-          lineInfo = `\n**Position:** Zeile ${line}, Spalte ${col}\n\n\`\`\`\n${ctx.map((l, i) => `${Math.max(1, line - 2) + i}: ${l}`).join('\n')}\n\`\`\``;
+          lineInfo = `${t().cc_validate_json.positionInfo(line, col)}\n\n\`\`\`\n${ctx.map((l, i) => `${Math.max(1, line - 2) + i}: ${l}`).join('\n')}\n\`\`\``;
         }
-        return { content: [{ type: "text", text: `\u274C **Ungueltiges JSON: ${path.basename(filePath)}**\n\n**Fehler:** ${errorMsg}${lineInfo}\n\n\uD83D\uDCA1 Nutze \`cc_fix_json\` fuer automatische Reparatur.` }] };
+        return { content: [{ type: "text", text: `${t().cc_validate_json.invalidHeader(path.basename(filePath))}\n\n${t().cc_validate_json.errorLabel(errorMsg)}${lineInfo}\n\n${t().cc_validate_json.hintFix}` }] };
       }
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -906,19 +907,19 @@ Args:
 server.registerTool(
   "cc_fix_encoding",
   {
-    title: "Encoding reparieren",
-    description: `Repariert Encoding-Fehler (Mojibake, doppeltes UTF-8).
+    title: "Fix Encoding",
+    description: `Repairs encoding errors (Mojibake, double UTF-8).
 
 Args:
-  - path (string): Pfad zur Datei
-  - dry_run (boolean): Nur anzeigen
-  - create_backup (boolean): Backup erstellen
+  - path (string): Path to the file
+  - dry_run (boolean): Preview only
+  - create_backup (boolean): Create backup
 
-Repariert 27+ Mojibake-Muster (deutsch, franzoesisch, spanisch).`,
+Repairs 27+ Mojibake patterns (German, French, Spanish).`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur Datei"),
-      dry_run: z.boolean().default(false).describe("Nur anzeigen"),
-      create_backup: z.boolean().default(true).describe("Backup erstellen")
+      path: z.string().min(1).describe("Path to the file"),
+      dry_run: z.boolean().default(false).describe("Preview only"),
+      create_backup: z.boolean().default(true).describe("Create backup")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -926,7 +927,7 @@ Repariert 27+ Mojibake-Muster (deutsch, franzoesisch, spanisch).`,
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const rawContent = await fs.readFile(filePath, "utf-8");
@@ -954,19 +955,19 @@ Repariert 27+ Mojibake-Muster (deutsch, franzoesisch, spanisch).`,
       }
 
       if (fixes.length === 0) {
-        return { content: [{ type: "text", text: `\u2705 Keine Encoding-Fehler in ${path.basename(filePath)}.` }] };
+        return { content: [{ type: "text", text: t().cc_fix_encoding.noErrors(path.basename(filePath)) }] };
       }
 
       if (params.dry_run) {
-        return { content: [{ type: "text", text: [`\uD83D\uDD0D **Encoding-Analyse: ${path.basename(filePath)}**`, '', ...fixes.map(f => `  - ${f}`)].join('\n') }] };
+        return { content: [{ type: "text", text: [t().cc_fix_encoding.analysisHeader(path.basename(filePath)), '', ...fixes.map(f => `  - ${f}`)].join('\n') }] };
       }
 
       if (params.create_backup) await fs.writeFile(filePath + '.bak', rawContent, "utf-8");
       await fs.writeFile(filePath, content, "utf-8");
 
-      return { content: [{ type: "text", text: [`\u2705 **Encoding repariert: ${path.basename(filePath)}**`, '', ...fixes.map(f => `  - ${f}`)].join('\n') }] };
+      return { content: [{ type: "text", text: [t().cc_fix_encoding.repairedHeader(path.basename(filePath)), '', ...fixes.map(f => `  - ${f}`)].join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -978,23 +979,23 @@ Repariert 27+ Mojibake-Muster (deutsch, franzoesisch, spanisch).`,
 server.registerTool(
   "cc_cleanup_file",
   {
-    title: "Datei bereinigen",
-    description: `Bereinigt Quellcode-Dateien: BOM, NUL-Bytes, Trailing Whitespace, Line Endings.
+    title: "Cleanup File",
+    description: `Cleans up source code files: BOM, NUL bytes, trailing whitespace, line endings.
 
 Args:
-  - path (string): Pfad zur Datei
-  - remove_bom (boolean): BOM entfernen
-  - remove_trailing_whitespace (boolean): Trailing Whitespace
+  - path (string): Path to the file
+  - remove_bom (boolean): Remove BOM
+  - remove_trailing_whitespace (boolean): Trailing whitespace
   - normalize_line_endings (string): "lf" | "crlf"
-  - remove_nul_bytes (boolean): NUL-Bytes entfernen
-  - dry_run (boolean): Nur anzeigen`,
+  - remove_nul_bytes (boolean): Remove NUL bytes
+  - dry_run (boolean): Preview only`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur Datei"),
-      remove_bom: z.boolean().default(true).describe("BOM entfernen"),
-      remove_trailing_whitespace: z.boolean().default(true).describe("Trailing Whitespace"),
-      normalize_line_endings: z.enum(["lf", "crlf"]).optional().describe("Line Endings"),
-      remove_nul_bytes: z.boolean().default(true).describe("NUL-Bytes"),
-      dry_run: z.boolean().default(false).describe("Nur anzeigen")
+      path: z.string().min(1).describe("Path to the file"),
+      remove_bom: z.boolean().default(true).describe("Remove BOM"),
+      remove_trailing_whitespace: z.boolean().default(true).describe("Trailing whitespace"),
+      normalize_line_endings: z.enum(["lf", "crlf"]).optional().describe("Line endings"),
+      remove_nul_bytes: z.boolean().default(true).describe("NUL bytes"),
+      dry_run: z.boolean().default(false).describe("Preview only")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -1002,16 +1003,16 @@ Args:
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const raw = await fs.readFile(filePath, "utf-8");
       let content = raw;
       const fixes: string[] = [];
 
-      if (params.remove_bom && content.charCodeAt(0) === 0xFEFF) { content = content.slice(1); fixes.push("BOM entfernt"); }
-      if (params.remove_nul_bytes && content.includes('\0')) { content = content.replace(/\0/g, ''); fixes.push("NUL-Bytes entfernt"); }
-      if (params.remove_trailing_whitespace) { const c = content; content = content.replace(/[ \t]+$/gm, ''); if (content !== c) fixes.push("Trailing Whitespace"); }
+      if (params.remove_bom && content.charCodeAt(0) === 0xFEFF) { content = content.slice(1); fixes.push(t().cc_cleanup_file.fixBomRemoved); }
+      if (params.remove_nul_bytes && content.includes('\0')) { content = content.replace(/\0/g, ''); fixes.push(t().cc_cleanup_file.fixNulRemoved); }
+      if (params.remove_trailing_whitespace) { const c = content; content = content.replace(/[ \t]+$/gm, ''); if (content !== c) fixes.push(t().cc_cleanup_file.fixTrailingWhitespace); }
       if (params.normalize_line_endings) {
         const c = content;
         content = content.replace(/\r\n/g, '\n');
@@ -1020,17 +1021,17 @@ Args:
       }
 
       if (fixes.length === 0) {
-        return { content: [{ type: "text", text: `\u2705 ${path.basename(filePath)} ist bereits sauber.` }] };
+        return { content: [{ type: "text", text: t().cc_cleanup_file.alreadyClean(path.basename(filePath)) }] };
       }
 
       if (params.dry_run) {
-        return { content: [{ type: "text", text: [`\uD83D\uDD0D **Vorschau: ${path.basename(filePath)}**`, '', ...fixes.map(f => `  - ${f}`)].join('\n') }] };
+        return { content: [{ type: "text", text: [t().cc_cleanup_file.previewHeader(path.basename(filePath)), '', ...fixes.map(f => `  - ${f}`)].join('\n') }] };
       }
 
       await fs.writeFile(filePath, content, "utf-8");
-      return { content: [{ type: "text", text: [`\u2705 **Bereinigt: ${path.basename(filePath)}**`, '', ...fixes.map(f => `  - ${f}`)].join('\n') }] };
+      return { content: [{ type: "text", text: [t().cc_cleanup_file.cleanedHeader(path.basename(filePath)), '', ...fixes.map(f => `  - ${f}`)].join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -1042,21 +1043,21 @@ Args:
 server.registerTool(
   "cc_convert_format",
   {
-    title: "Format konvertieren",
-    description: `Konvertiert zwischen JSON, CSV und INI Formaten.
+    title: "Convert Format",
+    description: `Converts between JSON, CSV, and INI formats.
 
 Args:
-  - input_path (string): Quelldatei
-  - output_path (string): Zieldatei
+  - input_path (string): Source file
+  - output_path (string): Target file
   - input_format (string): "json" | "csv" | "ini"
   - output_format (string): "json" | "csv" | "ini"
-  - json_indent (number): JSON Einrueckung`,
+  - json_indent (number): JSON indentation`,
     inputSchema: {
-      input_path: z.string().min(1).describe("Quelldatei"),
-      output_path: z.string().min(1).describe("Zieldatei"),
-      input_format: z.enum(["json", "csv", "ini"]).describe("Eingabeformat"),
-      output_format: z.enum(["json", "csv", "ini"]).describe("Ausgabeformat"),
-      json_indent: z.number().int().min(0).max(8).default(2).describe("JSON Einrueckung")
+      input_path: z.string().min(1).describe("Source file"),
+      output_path: z.string().min(1).describe("Target file"),
+      input_format: z.enum(["json", "csv", "ini"]).describe("Input format"),
+      output_format: z.enum(["json", "csv", "ini"]).describe("Output format"),
+      json_indent: z.number().int().min(0).max(8).default(2).describe("JSON indentation")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -1065,7 +1066,7 @@ Args:
       const inputPath = normalizePath(params.input_path);
       const outputPath = normalizePath(params.output_path);
       if (!await pathExists(inputPath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Quelldatei nicht gefunden: ${inputPath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.sourceFileNotFound(inputPath) }] };
       }
 
       const rawContent = await fs.readFile(inputPath, "utf-8");
@@ -1075,7 +1076,7 @@ Args:
         case 'json': data = JSON.parse(rawContent); break;
         case 'csv': {
           const lines = rawContent.trim().split('\n');
-          if (lines.length < 2) return { isError: true, content: [{ type: "text", text: `\u274C CSV: mindestens Header + 1 Datenzeile noetig.` }] };
+          if (lines.length < 2) return { isError: true, content: [{ type: "text", text: t().cc_convert_format.csvMinRows }] };
           const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
           data = lines.slice(1).map(line => {
             const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
@@ -1090,11 +1091,11 @@ Args:
           let section = '_default';
           result[section] = {};
           for (const line of rawContent.split('\n')) {
-            const t = line.trim();
-            if (!t || t.startsWith(';') || t.startsWith('#')) continue;
-            const sm = t.match(/^\[(.+)\]$/);
+            const tl = line.trim();
+            if (!tl || tl.startsWith(';') || tl.startsWith('#')) continue;
+            const sm = tl.match(/^\[(.+)\]$/);
             if (sm) { section = sm[1]; result[section] = result[section] || {}; }
-            else { const eq = t.indexOf('='); if (eq > 0) result[section][t.substring(0, eq).trim()] = t.substring(eq + 1).trim(); }
+            else { const eq = tl.indexOf('='); if (eq > 0) result[section][tl.substring(0, eq).trim()] = tl.substring(eq + 1).trim(); }
           }
           if (Object.keys(result._default).length === 0) delete result._default;
           data = result;
@@ -1106,7 +1107,7 @@ Args:
       switch (params.output_format) {
         case 'json': output = JSON.stringify(data, null, params.json_indent || undefined); break;
         case 'csv': {
-          if (!Array.isArray(data)) return { isError: true, content: [{ type: "text", text: `\u274C CSV-Export erfordert ein Array.` }] };
+          if (!Array.isArray(data)) return { isError: true, content: [{ type: "text", text: t().cc_convert_format.csvRequiresArray }] };
           const headers = Object.keys((data as Record<string, unknown>[])[0] || {});
           const rows = (data as Record<string, unknown>[]).map(item =>
             headers.map(h => { const v = String(item[h] ?? ''); return v.includes(',') || v.includes('"') ? `"${v.replace(/"/g, '""')}"` : v; }).join(','));
@@ -1114,7 +1115,7 @@ Args:
           break;
         }
         case 'ini': {
-          if (typeof data !== 'object' || data === null || Array.isArray(data)) return { isError: true, content: [{ type: "text", text: `\u274C INI-Export erfordert ein Objekt.` }] };
+          if (typeof data !== 'object' || data === null || Array.isArray(data)) return { isError: true, content: [{ type: "text", text: t().cc_convert_format.iniRequiresObject }] };
           const lines: string[] = [];
           for (const [section, values] of Object.entries(data as Record<string, unknown>)) {
             if (typeof values === 'object' && values !== null && !Array.isArray(values)) {
@@ -1133,9 +1134,9 @@ Args:
       await fs.writeFile(outputPath, output, "utf-8");
       const outStats = await fs.stat(outputPath);
 
-      return { content: [{ type: "text", text: [`\u2705 **${params.input_format.toUpperCase()} \u2192 ${params.output_format.toUpperCase()}**`, '', `| | |`, `|---|---|`, `| Quelle | ${inputPath} |`, `| Ziel | ${outputPath} |`, `| Groesse | ${formatFileSize(outStats.size)} |`].join('\n') }] };
+      return { content: [{ type: "text", text: [t().cc_convert_format.conversionHeader(params.input_format.toUpperCase(), params.output_format.toUpperCase()), '', `| | |`, `|---|---|`, `| ${t().cc_convert_format.labelSource} | ${inputPath} |`, `| ${t().cc_convert_format.labelTarget} | ${outputPath} |`, `| ${t().cc_convert_format.labelSize} | ${formatFileSize(outStats.size)} |`].join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -1147,19 +1148,19 @@ Args:
 server.registerTool(
   "cc_fix_umlauts",
   {
-    title: "Umlaute reparieren",
-    description: `Repariert kaputte deutsche Umlaute in Quellcode-Dateien.
+    title: "Fix Umlauts",
+    description: `Repairs broken German umlauts in source code files.
 
 Args:
-  - path (string): Pfad zur Datei
-  - dry_run (boolean): Nur anzeigen
-  - create_backup (boolean): Backup erstellen
+  - path (string): Path to the file
+  - dry_run (boolean): Preview only
+  - create_backup (boolean): Create backup
 
-Erkennt 70+ Muster kaputte Umlaute und ersetzt sie korrekt.`,
+Detects 70+ patterns of broken umlauts and replaces them correctly.`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad zur Datei"),
-      dry_run: z.boolean().default(false).describe("Nur anzeigen"),
-      create_backup: z.boolean().default(true).describe("Backup erstellen")
+      path: z.string().min(1).describe("Path to the file"),
+      dry_run: z.boolean().default(false).describe("Preview only"),
+      create_backup: z.boolean().default(true).describe("Create backup")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -1167,7 +1168,7 @@ Erkennt 70+ Muster kaputte Umlaute und ersetzt sie korrekt.`,
     try {
       const filePath = normalizePath(params.path);
       if (!await pathExists(filePath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${filePath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
       }
 
       const rawContent = await fs.readFile(filePath, "utf-8");
@@ -1205,19 +1206,19 @@ Erkennt 70+ Muster kaputte Umlaute und ersetzt sie korrekt.`,
       }
 
       if (fixes.length === 0) {
-        return { content: [{ type: "text", text: `\u2705 Keine kaputten Umlaute in ${path.basename(filePath)}.` }] };
+        return { content: [{ type: "text", text: t().cc_fix_umlauts.noIssues(path.basename(filePath)) }] };
       }
 
       if (params.dry_run) {
-        return { content: [{ type: "text", text: [`\uD83D\uDD0D **Umlaut-Analyse: ${path.basename(filePath)}**`, '', `${totalFixes} Ersetzungen:`, ...fixes.map(f => `  - ${f}`)].join('\n') }] };
+        return { content: [{ type: "text", text: [t().cc_fix_umlauts.analysisHeader(path.basename(filePath)), '', t().cc_fix_umlauts.replacements(totalFixes), ...fixes.map(f => `  - ${f}`)].join('\n') }] };
       }
 
       if (params.create_backup) await fs.writeFile(filePath + '.bak', rawContent, "utf-8");
       await fs.writeFile(filePath, content, "utf-8");
 
-      return { content: [{ type: "text", text: [`\u2705 **Umlaute repariert: ${path.basename(filePath)}**`, '', `${totalFixes} Ersetzungen:`, ...fixes.map(f => `  - ${f}`)].join('\n') }] };
+      return { content: [{ type: "text", text: [t().cc_fix_umlauts.repairedHeader(path.basename(filePath)), '', t().cc_fix_umlauts.replacements(totalFixes), ...fixes.map(f => `  - ${f}`)].join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -1229,19 +1230,19 @@ Erkennt 70+ Muster kaputte Umlaute und ersetzt sie korrekt.`,
 server.registerTool(
   "cc_scan_emoji",
   {
-    title: "Emoji-Scanner",
-    description: `Scannt Dateien nach Emojis und zeigt ASCII-Alternativen.
+    title: "Scan Emoji",
+    description: `Scans files for emojis and shows ASCII alternatives.
 
 Args:
-  - path (string): Pfad zur Datei oder Verzeichnis
-  - recursive (boolean): Rekursiv scannen
-  - extensions (string): Nur bestimmte Erweiterungen
+  - path (string): Path to the file or directory
+  - recursive (boolean): Scan recursively
+  - extensions (string): Only certain extensions
 
-Nützlich fuer Systeme die keine Unicode/Emoji unterstuetzen.`,
+Useful for systems that don't support Unicode/Emoji.`,
     inputSchema: {
-      path: z.string().min(1).describe("Pfad"),
-      recursive: z.boolean().default(false).describe("Rekursiv"),
-      extensions: z.string().default(".py,.js,.ts,.json,.md,.txt").describe("Erweiterungen")
+      path: z.string().min(1).describe("Path"),
+      recursive: z.boolean().default(false).describe("Recursive"),
+      extensions: z.string().default(".py,.js,.ts,.json,.md,.txt").describe("Extensions")
     },
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -1249,7 +1250,7 @@ Nützlich fuer Systeme die keine Unicode/Emoji unterstuetzen.`,
     try {
       const targetPath = normalizePath(params.path);
       if (!await pathExists(targetPath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Pfad nicht gefunden: ${targetPath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.pathNotFound(targetPath) }] };
       }
 
       const extFilter = params.extensions.split(',').map(e => e.trim().toLowerCase());
@@ -1299,7 +1300,7 @@ Nützlich fuer Systeme die keine Unicode/Emoji unterstuetzen.`,
       }
 
       if (results.length === 0) {
-        return { content: [{ type: "text", text: `\u2705 Keine Emojis gefunden in ${files.length} Dateien.` }] };
+        return { content: [{ type: "text", text: t().cc_scan_emoji.noEmojis(files.length) }] };
       }
 
       // Group by emoji
@@ -1309,19 +1310,19 @@ Nützlich fuer Systeme die keine Unicode/Emoji unterstuetzen.`,
       }
 
       const output = [
-        `\uD83D\uDD0D **Emoji-Scan: ${files.length} Dateien**`, '',
-        `| Emoji | Anzahl | Codepoint |`, `|---|---|---|`,
+        t().cc_scan_emoji.scanHeader(files.length), '',
+        `| ${t().cc_scan_emoji.emojiTableEmoji} | ${t().cc_scan_emoji.emojiTableCount} | ${t().cc_scan_emoji.emojiTableCodepoint} |`, `|---|---|---|`,
         ...[...emojiCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30).map(
           ([emoji, count]) => `| ${emoji} | ${count} | U+${emoji.codePointAt(0)?.toString(16).toUpperCase()} |`
         ), '',
-        `**Vorkommen (erste 30):**`,
+        t().cc_scan_emoji.occurrencesHeader,
         ...results.slice(0, 30).map(r => `  ${r.file}:${r.line} ${r.emoji} \`${r.text}\``),
-        results.length > 30 ? `\n  ... und ${results.length - 30} weitere` : ''
+        results.length > 30 ? `\n${t().cc_scan_emoji.andMore(results.length - 30)}` : ''
       ];
 
       return { content: [{ type: "text", text: output.join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -1333,18 +1334,18 @@ Nützlich fuer Systeme die keine Unicode/Emoji unterstuetzen.`,
 server.registerTool(
   "cc_generate_licenses",
   {
-    title: "Lizenzen generieren",
-    description: `Generiert eine Third-Party-Lizenzdatei fuer ein npm- oder Python-Projekt.
+    title: "Generate Licenses",
+    description: `Generates a third-party license file for an npm or Python project.
 
 Args:
-  - project_dir (string): Projektverzeichnis
-  - output_path (string): Ausgabedatei
+  - project_dir (string): Project directory
+  - output_path (string): Output file
   - format (string): "text" | "json" | "csv"
 
-Liest package.json (npm) oder pip-Pakete und sammelt Lizenzinfos.`,
+Reads package.json (npm) or pip packages and collects license info.`,
     inputSchema: {
-      project_dir: z.string().min(1).describe("Projektverzeichnis"),
-      output_path: z.string().min(1).describe("Ausgabedatei"),
+      project_dir: z.string().min(1).describe("Project directory"),
+      output_path: z.string().min(1).describe("Output file"),
       format: z.enum(["text", "json", "csv"]).default("text").describe("Format")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
@@ -1405,7 +1406,7 @@ Liest package.json (npm) oder pip-Pakete und sammelt Lizenzinfos.`,
       }
 
       if (licenses.length === 0) {
-        return { content: [{ type: "text", text: `\u274C Kein package.json oder requirements.txt in ${projectDir} gefunden.` }] };
+        return { content: [{ type: "text", text: t().cc_generate_licenses.noPackageFiles(projectDir) }] };
       }
 
       // Generate output
@@ -1428,9 +1429,9 @@ Liest package.json (npm) oder pip-Pakete und sammelt Lizenzinfos.`,
       if (!await pathExists(outDir)) await fs.mkdir(outDir, { recursive: true });
       await fs.writeFile(outputPath, output, "utf-8");
 
-      return { content: [{ type: "text", text: [`\u2705 **Lizenzen generiert: ${licenses.length} Pakete**`, '', `| | |`, `|---|---|`, `| Datei | ${outputPath} |`, `| Format | ${params.format} |`, `| Pakete | ${licenses.length} |`].join('\n') }] };
+      return { content: [{ type: "text", text: [t().cc_generate_licenses.generatedHeader(licenses.length), '', `| | |`, `|---|---|`, `| ${t().cc_generate_licenses.labelFile} | ${outputPath} |`, `| ${t().cc_generate_licenses.labelFormat} | ${params.format} |`, `| ${t().cc_generate_licenses.labelPackages} | ${licenses.length} |`].join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
   }
 );
@@ -1442,19 +1443,19 @@ Liest package.json (npm) oder pip-Pakete und sammelt Lizenzinfos.`,
 server.registerTool(
   "cc_md_to_pdf",
   {
-    title: "Markdown zu HTML",
-    description: `Konvertiert Markdown zu formatiertem HTML (druckbar als PDF).
+    title: "Markdown to HTML",
+    description: `Converts Markdown to formatted HTML (printable as PDF).
 
 Args:
-  - input_path (string): Pfad zur Markdown-Datei
-  - output_path (string): Pfad zur HTML-Ausgabe
-  - title (string, optional): Dokumenttitel
+  - input_path (string): Path to the Markdown file
+  - output_path (string): Path to the HTML output
+  - title (string, optional): Document title
 
-Erzeugt eigenstaendiges HTML mit CSS-Styling, druckbar als PDF ueber den Browser.`,
+Produces standalone HTML with CSS styling, printable as PDF via browser.`,
     inputSchema: {
-      input_path: z.string().min(1).describe("Markdown-Datei"),
-      output_path: z.string().min(1).describe("HTML-Ausgabe"),
-      title: z.string().optional().describe("Dokumenttitel")
+      input_path: z.string().min(1).describe("Markdown file"),
+      output_path: z.string().min(1).describe("HTML output"),
+      title: z.string().optional().describe("Document title")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
   },
@@ -1463,7 +1464,7 @@ Erzeugt eigenstaendiges HTML mit CSS-Styling, druckbar als PDF ueber den Browser
       const inputPath = normalizePath(params.input_path);
       const outputPath = normalizePath(params.output_path);
       if (!await pathExists(inputPath)) {
-        return { isError: true, content: [{ type: "text", text: `\u274C Datei nicht gefunden: ${inputPath}` }] };
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(inputPath) }] };
       }
 
       const md = await fs.readFile(inputPath, "utf-8");
@@ -1637,10 +1638,24 @@ ${html}
       await fs.writeFile(outputPath, fullHtml, "utf-8");
       const outStats = await fs.stat(outputPath);
 
-      return { content: [{ type: "text", text: [`\u2705 **Markdown \u2192 HTML: ${path.basename(outputPath)}**`, '', `| | |`, `|---|---|`, `| Quelle | ${inputPath} |`, `| Ziel | ${outputPath} |`, `| Groesse | ${formatFileSize(outStats.size)} |`, '', `\uD83D\uDCA1 Oeffne die HTML-Datei im Browser und drucke als PDF.`].join('\n') }] };
+      return { content: [{ type: "text", text: [t().cc_md_to_pdf.conversionHeader(path.basename(outputPath)), '', `| | |`, `|---|---|`, `| ${t().cc_md_to_pdf.labelSource} | ${inputPath} |`, `| ${t().cc_md_to_pdf.labelTarget} | ${outputPath} |`, `| ${t().cc_md_to_pdf.labelSize} | ${formatFileSize(outStats.size)} |`, '', t().cc_md_to_pdf.hintPrint].join('\n') }] };
     } catch (error) {
-      return { isError: true, content: [{ type: "text", text: `\u274C Fehler: ${error instanceof Error ? error.message : String(error)}` }] };
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }
+  }
+);
+
+// ============================================================================
+// Tool 15: Set Language
+// ============================================================================
+
+server.tool(
+  "cc_set_language",
+  "Set the output language for CodeCommander tools",
+  { language: z.enum(["de", "en"]).describe("Language code") },
+  async ({ language }) => {
+    setLanguage(language);
+    return { content: [{ type: "text", text: t().cc_set_language.languageSet(language) }] };
   }
 );
 
@@ -1651,7 +1666,7 @@ ${html}
 async function main(): Promise<void> {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("\uD83D\uDE80 BACH CodeCommander MCP Server gestartet");
+  console.error(t().common.serverStarted);
 }
 
 main().catch((error) => {
