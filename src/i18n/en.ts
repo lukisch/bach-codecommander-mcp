@@ -144,6 +144,7 @@ export const en: Translations = {
     csvMinRows: `\u274C CSV: at least header + 1 data row required.`,
     csvRequiresArray: `\u274C CSV export requires an array.`,
     iniRequiresObject: `\u274C INI export requires an object.`,
+    unsupportedFormat: (format) => `\u274C Unsupported format: ${format}`,
     labelSource: 'Source',
     labelTarget: 'Target',
     labelSize: 'Size',
@@ -199,5 +200,21 @@ export const en: Translations = {
   // === Tool 16: cc_set_language ===
   cc_set_language: {
     languageSet: (lang) => `Language set to: ${lang}`,
+  },
+
+  // === Tool 17: cc_diff_files ===
+  cc_diff_files: {
+    description: 'Compare two files and show differences in unified diff format',
+    header: (fileA, fileB) => `**Diff: ${fileA} \u2194 ${fileB}**`,
+    identical: 'Files are identical.',
+    linesChanged: (added, removed) => `${added} lines added, ${removed} lines removed`,
+  },
+
+  // === Tool 18: cc_regex_test ===
+  cc_regex_test: {
+    description: 'Test regular expressions against text or file content',
+    header: (pattern, flags) => `**Regex: /${pattern}/${flags}**`,
+    matchCount: (count) => `${count} matches found`,
+    noMatches: 'No matches found.',
   },
 };

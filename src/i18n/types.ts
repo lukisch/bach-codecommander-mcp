@@ -139,6 +139,7 @@ export interface Translations {
     csvMinRows: string;
     csvRequiresArray: string;
     iniRequiresObject: string;
+    unsupportedFormat: (format: string) => string;
     labelSource: string;
     labelTarget: string;
     labelSize: string;
@@ -194,5 +195,21 @@ export interface Translations {
   // === Tool 16: cc_set_language ===
   cc_set_language: {
     languageSet: (lang: string) => string;
+  };
+
+  // === Tool 17: cc_diff_files ===
+  cc_diff_files: {
+    description: string;
+    header: (fileA: string, fileB: string) => string;
+    identical: string;
+    linesChanged: (added: number, removed: number) => string;
+  };
+
+  // === Tool 18: cc_regex_test ===
+  cc_regex_test: {
+    description: string;
+    header: (pattern: string, flags: string) => string;
+    matchCount: (count: number) => string;
+    noMatches: string;
   };
 }

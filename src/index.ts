@@ -9,7 +9,7 @@
  * See LICENSE file for details.
  *
  * @author Lukas (BACH)
- * @version 1.2.0
+ * @version 1.3.0
  * @license MIT
  */
 
@@ -22,6 +22,9 @@ import * as fsSync from "fs";
 import { exec, execSync } from "child_process";
 import { promisify } from "util";
 import { t, setLanguage } from './i18n/index.js';
+import * as yaml from 'js-yaml';
+import * as toml from 'smol-toml';
+import { XMLParser, XMLBuilder } from 'fast-xml-parser';
 
 const execAsync = promisify(exec);
 
@@ -31,7 +34,7 @@ const execAsync = promisify(exec);
 
 const server = new McpServer({
   name: "bach-codecommander-mcp",
-  version: "1.2.0"
+  version: "1.3.0"
 });
 
 // ============================================================================
@@ -275,6 +278,256 @@ function analyzePythonCode(content: string): CodeAnalysis {
   }
 
   return { classes, functions, imports, totalLines, codeLines, commentLines, blankLines, complexity };
+}
+
+// ============================================================================
+// TOON Format Parser/Serializer
+// ============================================================================
+
+function parseToon(content: string): Record<string, any> {
+  const result: Record<string, any> = {};
+  let currentSection = result;
+  let currentPath: string[] = [];
+
+  for (const rawLine of content.split('\n')) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    // Section header [section.subsection]
+    const sectionMatch = line.match(/^\[([^\]]+)\]$/);
+    if (sectionMatch) {
+      currentPath = sectionMatch[1].split('.');
+      currentSection = result;
+      for (const part of currentPath) {
+        if (!currentSection[part]) currentSection[part] = {};
+        currentSection = currentSection[part];
+      }
+      continue;
+    }
+
+    // Key = Value
+    const kvMatch = line.match(/^([^=]+?)\s*=\s*(.*)$/);
+    if (kvMatch) {
+      let key = kvMatch[1].trim();
+      let value: any = kvMatch[2].trim();
+
+      // Array notation: key[] = value
+      const isArray = key.endsWith('[]');
+      if (isArray) key = key.slice(0, -2).trim();
+
+      // Parse value
+      if (value === 'true') value = true;
+      else if (value === 'false') value = false;
+      else if (value === 'null') value = null;
+      else if (/^-?\d+$/.test(value)) value = parseInt(value, 10);
+      else if (/^-?\d+\.\d+$/.test(value)) value = parseFloat(value);
+      else if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+
+      if (isArray) {
+        if (!Array.isArray(currentSection[key])) currentSection[key] = [];
+        currentSection[key].push(value);
+      } else {
+        currentSection[key] = value;
+      }
+    }
+  }
+  return result;
+}
+
+function formatToonValue(value: any): string {
+  if (value === null) return 'null';
+  if (typeof value === 'boolean') return value ? 'true' : 'false';
+  if (typeof value === 'number') return String(value);
+  const str = String(value);
+  if (str.includes('=') || str.includes('#') || str.includes('[') || str.includes('\n')) {
+    return `"${str.replace(/"/g, '\\"')}"`;
+  }
+  return str;
+}
+
+function serializeToon(obj: Record<string, any>, prefix: string = ''): string {
+  const lines: string[] = [];
+  const simple: [string, any][] = [];
+  const complex: [string, any][] = [];
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+      complex.push([key, value]);
+    } else {
+      simple.push([key, value]);
+    }
+  }
+
+  for (const [key, value] of simple) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        lines.push(`${key}[] = ${formatToonValue(item)}`);
+      }
+    } else {
+      lines.push(`${key} = ${formatToonValue(value)}`);
+    }
+  }
+
+  for (const [key, value] of complex) {
+    const sectionPath = prefix ? `${prefix}.${key}` : key;
+    lines.push('');
+    lines.push(`[${sectionPath}]`);
+    lines.push(serializeToon(value, sectionPath));
+  }
+
+  return lines.join('\n');
+}
+
+// ============================================================================
+// Unified Diff Algorithm (LCS-based)
+// ============================================================================
+
+function computeLCS(a: string[], b: string[]): number[][] {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      if (a[i - 1] === b[j - 1]) {
+        dp[i][j] = dp[i - 1][j - 1] + 1;
+      } else {
+        dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+      }
+    }
+  }
+  return dp;
+}
+
+interface DiffHunk {
+  startA: number;
+  countA: number;
+  startB: number;
+  countB: number;
+  lines: string[];
+}
+
+function computeUnifiedDiff(linesA: string[], linesB: string[], contextLines: number, fileA: string, fileB: string): string {
+  // Compute LCS-based diff
+  const dp = computeLCS(linesA, linesB);
+  const changes: Array<{ type: 'equal' | 'delete' | 'insert'; lineA?: number; lineB?: number; text: string }> = [];
+
+  let i = linesA.length;
+  let j = linesB.length;
+  const backtrack: Array<{ type: 'equal' | 'delete' | 'insert'; lineA?: number; lineB?: number; text: string }> = [];
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && linesA[i - 1] === linesB[j - 1]) {
+      backtrack.push({ type: 'equal', lineA: i - 1, lineB: j - 1, text: linesA[i - 1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      backtrack.push({ type: 'insert', lineB: j - 1, text: linesB[j - 1] });
+      j--;
+    } else {
+      backtrack.push({ type: 'delete', lineA: i - 1, text: linesA[i - 1] });
+      i--;
+    }
+  }
+
+  backtrack.reverse();
+  changes.push(...backtrack);
+
+  // Group changes into hunks with context
+  const hunks: DiffHunk[] = [];
+  let hunkLines: string[] = [];
+  let hunkStartA = 0;
+  let hunkStartB = 0;
+  let hunkCountA = 0;
+  let hunkCountB = 0;
+  let lastChangeIdx = -999;
+
+  for (let idx = 0; idx < changes.length; idx++) {
+    const c = changes[idx];
+    if (c.type !== 'equal') {
+      // Start or extend a hunk
+      const contextStart = Math.max(0, idx - contextLines);
+      if (idx - lastChangeIdx > contextLines * 2 + 1 && hunks.length === 0 && hunkLines.length === 0 && lastChangeIdx < 0) {
+        // First change - add leading context
+      } else if (idx - lastChangeIdx > contextLines * 2 + 1 && hunkLines.length > 0) {
+        // Close current hunk with trailing context
+        let trailingAdded = 0;
+        for (let k = lastChangeIdx + 1; k < changes.length && trailingAdded < contextLines; k++) {
+          if (changes[k].type === 'equal') {
+            hunkLines.push(` ${changes[k].text}`);
+            hunkCountA++; hunkCountB++;
+            trailingAdded++;
+          }
+        }
+        hunks.push({ startA: hunkStartA, countA: hunkCountA, startB: hunkStartB, countB: hunkCountB, lines: [...hunkLines] });
+        hunkLines = [];
+        hunkCountA = 0; hunkCountB = 0;
+      }
+
+      // Add leading context for new hunk
+      if (hunkLines.length === 0) {
+        let contextCount = 0;
+        for (let k = idx - 1; k >= 0 && contextCount < contextLines; k--) {
+          if (changes[k].type === 'equal') {
+            hunkLines.unshift(` ${changes[k].text}`);
+            contextCount++;
+          } else break;
+        }
+        // Determine start positions
+        hunkStartA = (c.lineA !== undefined ? c.lineA : (changes[idx - 1]?.lineA !== undefined ? changes[idx - 1].lineA! + 1 : 0)) - contextCount;
+        hunkStartB = (c.lineB !== undefined ? c.lineB : (changes[idx - 1]?.lineB !== undefined ? changes[idx - 1].lineB! + 1 : 0)) - contextCount;
+        if (hunkStartA < 0) hunkStartA = 0;
+        if (hunkStartB < 0) hunkStartB = 0;
+        hunkCountA = contextCount;
+        hunkCountB = contextCount;
+      } else {
+        // Fill gap between changes with context (equal lines)
+        for (let k = lastChangeIdx + 1; k < idx; k++) {
+          if (changes[k].type === 'equal') {
+            hunkLines.push(` ${changes[k].text}`);
+            hunkCountA++; hunkCountB++;
+          }
+        }
+      }
+
+      if (c.type === 'delete') {
+        hunkLines.push(`-${c.text}`);
+        hunkCountA++;
+      } else {
+        hunkLines.push(`+${c.text}`);
+        hunkCountB++;
+      }
+      lastChangeIdx = idx;
+    }
+  }
+
+  // Close last hunk
+  if (hunkLines.length > 0) {
+    let trailingAdded = 0;
+    for (let k = lastChangeIdx + 1; k < changes.length && trailingAdded < contextLines; k++) {
+      if (changes[k].type === 'equal') {
+        hunkLines.push(` ${changes[k].text}`);
+        hunkCountA++; hunkCountB++;
+        trailingAdded++;
+      }
+    }
+    hunks.push({ startA: hunkStartA, countA: hunkCountA, startB: hunkStartB, countB: hunkCountB, lines: [...hunkLines] });
+  }
+
+  if (hunks.length === 0) return '';
+
+  // Format output
+  const output: string[] = [
+    `--- ${fileA}`,
+    `+++ ${fileB}`,
+  ];
+
+  for (const hunk of hunks) {
+    output.push(`@@ -${hunk.startA + 1},${hunk.countA} +${hunk.startB + 1},${hunk.countB} @@`);
+    output.push(...hunk.lines);
+  }
+
+  return output.join('\n');
 }
 
 // ============================================================================
@@ -1045,19 +1298,19 @@ server.registerTool(
   "cc_convert_format",
   {
     title: "Convert Format",
-    description: `Converts between JSON, CSV, and INI formats.
+    description: `Converts between JSON, CSV, INI, YAML, TOML, XML, and TOON formats.
 
 Args:
   - input_path (string): Source file
   - output_path (string): Target file
-  - input_format (string): "json" | "csv" | "ini"
-  - output_format (string): "json" | "csv" | "ini"
+  - input_format (string): "json" | "csv" | "ini" | "yaml" | "toml" | "xml" | "toon"
+  - output_format (string): "json" | "csv" | "ini" | "yaml" | "toml" | "xml" | "toon"
   - json_indent (number): JSON indentation`,
     inputSchema: {
       input_path: z.string().min(1).describe("Source file"),
       output_path: z.string().min(1).describe("Target file"),
-      input_format: z.enum(["json", "csv", "ini"]).describe("Input format"),
-      output_format: z.enum(["json", "csv", "ini"]).describe("Output format"),
+      input_format: z.enum(["json", "csv", "ini", "yaml", "toml", "xml", "toon"]).describe("Input format"),
+      output_format: z.enum(["json", "csv", "ini", "yaml", "toml", "xml", "toon"]).describe("Output format"),
       json_indent: z.number().int().min(0).max(8).default(2).describe("JSON indentation")
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false }
@@ -1102,6 +1355,23 @@ Args:
           data = result;
           break;
         }
+        case 'yaml': {
+          data = yaml.load(rawContent);
+          break;
+        }
+        case 'toml': {
+          data = toml.parse(rawContent);
+          break;
+        }
+        case 'xml': {
+          const xmlParser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', textNodeName: '#text' });
+          data = xmlParser.parse(rawContent);
+          break;
+        }
+        case 'toon': {
+          data = parseToon(rawContent);
+          break;
+        }
       }
 
       let output: string;
@@ -1126,6 +1396,29 @@ Args:
             } else lines.push(`${section} = ${values}`);
           }
           output = lines.join('\n');
+          break;
+        }
+        case 'yaml': {
+          output = yaml.dump(data, { indent: 2, lineWidth: 120, noRefs: true });
+          break;
+        }
+        case 'toml': {
+          if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+            return { isError: true, content: [{ type: "text", text: t().cc_convert_format.unsupportedFormat('TOML requires an object as root') }] };
+          }
+          output = toml.stringify(data as Record<string, any>);
+          break;
+        }
+        case 'xml': {
+          const xmlBuilder = new XMLBuilder({ ignoreAttributes: false, attributeNamePrefix: '@_', textNodeName: '#text', format: true, indentBy: '  ' });
+          output = xmlBuilder.build(data);
+          break;
+        }
+        case 'toon': {
+          if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+            return { isError: true, content: [{ type: "text", text: t().cc_convert_format.unsupportedFormat('TOON requires an object as root') }] };
+          }
+          output = serializeToon(data as Record<string, any>);
           break;
         }
       }
@@ -1896,6 +2189,154 @@ ${html}
       const outStats = await fs.stat(outputPath);
       const browserName = path.basename(browser).replace(/\.exe$/i, '');
       return { content: [{ type: "text", text: [t().cc_md_to_pdf.conversionHeader(path.basename(outputPath)), '', `| | |`, `|---|---|`, `| ${t().cc_md_to_pdf.labelSource} | ${inputPath} |`, `| ${t().cc_md_to_pdf.labelTarget} | ${outputPath} |`, `| ${t().cc_md_to_pdf.labelSize} | ${formatFileSize(outStats.size)} |`, '', t().cc_md_to_pdf.browserUsed(browserName)].join('\n') }] };
+    } catch (error) {
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
+    }
+  }
+);
+
+// ============================================================================
+// Tool 17: Diff Files
+// ============================================================================
+
+server.registerTool(
+  "cc_diff_files",
+  {
+    title: "Diff Files",
+    description: t().cc_diff_files.description,
+    inputSchema: {
+      file_a: z.string().min(1).describe("Path to first file"),
+      file_b: z.string().min(1).describe("Path to second file"),
+      context_lines: z.number().int().min(0).max(20).default(3).describe("Number of context lines (default: 3)")
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+  },
+  async (params) => {
+    try {
+      const fileA = normalizePath(params.file_a);
+      const fileB = normalizePath(params.file_b);
+
+      if (!await pathExists(fileA)) {
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(fileA) }] };
+      }
+      if (!await pathExists(fileB)) {
+        return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(fileB) }] };
+      }
+
+      const contentA = await fs.readFile(fileA, 'utf-8');
+      const contentB = await fs.readFile(fileB, 'utf-8');
+      const linesA = contentA.split('\n');
+      const linesB = contentB.split('\n');
+
+      const contextCount = params.context_lines ?? 3;
+
+      if (contentA === contentB) {
+        return { content: [{ type: "text", text: [t().cc_diff_files.header(path.basename(fileA), path.basename(fileB)), '', t().cc_diff_files.identical].join('\n') }] };
+      }
+
+      const diffOutput = computeUnifiedDiff(linesA, linesB, contextCount, fileA, fileB);
+
+      // Count additions and deletions
+      const diffLines = diffOutput.split('\n');
+      let added = 0;
+      let removed = 0;
+      for (const line of diffLines) {
+        if (line.startsWith('+') && !line.startsWith('+++')) added++;
+        if (line.startsWith('-') && !line.startsWith('---')) removed++;
+      }
+
+      const output = [
+        t().cc_diff_files.header(path.basename(fileA), path.basename(fileB)),
+        '',
+        t().cc_diff_files.linesChanged(added, removed),
+        '',
+        '```diff',
+        diffOutput,
+        '```'
+      ];
+
+      return { content: [{ type: "text", text: output.join('\n') }] };
+    } catch (error) {
+      return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
+    }
+  }
+);
+
+// ============================================================================
+// Tool 18: Regex Tester
+// ============================================================================
+
+server.registerTool(
+  "cc_regex_test",
+  {
+    title: "Regex Tester",
+    description: t().cc_regex_test.description,
+    inputSchema: {
+      pattern: z.string().min(1).describe("Regular expression pattern"),
+      flags: z.string().default('g').describe("Regex flags (g, i, m, s, u)"),
+      text: z.string().optional().describe("Text to test against (or use file_path)"),
+      file_path: z.string().optional().describe("File to test against (alternative to text)"),
+      replace_with: z.string().optional().describe("Optional replacement string")
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+  },
+  async (params) => {
+    try {
+      let input = params.text;
+      if (!input && params.file_path) {
+        const filePath = normalizePath(params.file_path);
+        if (!await pathExists(filePath)) {
+          return { isError: true, content: [{ type: "text", text: t().common.fileNotFound(filePath) }] };
+        }
+        input = await fs.readFile(filePath, 'utf-8');
+      }
+      if (!input) {
+        return { isError: true, content: [{ type: "text", text: t().common.error('Either text or file_path required') }] };
+      }
+
+      const flags = params.flags || 'g';
+      const matchFlags = flags.includes('g') ? flags : flags + 'g';
+      const regex = new RegExp(params.pattern, matchFlags);
+      const matches = [...input.matchAll(regex)];
+
+      const output: string[] = [
+        t().cc_regex_test.header(params.pattern, flags),
+        '',
+      ];
+
+      if (matches.length === 0) {
+        output.push(t().cc_regex_test.noMatches);
+      } else {
+        output.push(t().cc_regex_test.matchCount(matches.length));
+        output.push('');
+
+        for (let i = 0; i < matches.length && i < 50; i++) {
+          const m = matches[i];
+          output.push(`Match ${i + 1}: \`${m[0]}\` at index ${m.index}`);
+          if (m.length > 1) {
+            for (let g = 1; g < m.length; g++) {
+              output.push(`  Group ${g}: \`${m[g]}\``);
+            }
+          }
+        }
+        if (matches.length > 50) {
+          output.push(`  ... and ${matches.length - 50} more matches`);
+        }
+      }
+
+      if (params.replace_with !== undefined) {
+        const replaceRegex = new RegExp(params.pattern, flags);
+        const replaced = input.replace(replaceRegex, params.replace_with);
+        output.push('');
+        output.push('**Replacement preview:**');
+        // Show first 2000 chars of replacement
+        const preview = replaced.length > 2000 ? replaced.substring(0, 2000) + '\n...(truncated)' : replaced;
+        output.push('```');
+        output.push(preview);
+        output.push('```');
+      }
+
+      return { content: [{ type: "text", text: output.join('\n') }] };
     } catch (error) {
       return { isError: true, content: [{ type: "text", text: t().common.error(error instanceof Error ? error.message : String(error)) }] };
     }

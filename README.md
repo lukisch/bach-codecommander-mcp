@@ -4,9 +4,9 @@
 [![npm version](https://img.shields.io/npm/v/bach-codecommander-mcp.svg)](https://www.npmjs.com/package/bach-codecommander-mcp)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org/)
 
-A developer-focused **Model Context Protocol (MCP) server** that gives AI assistants code analysis, JSON repair, encoding fix, import organization, and format conversion capabilities.
+A developer-focused **Model Context Protocol (MCP) server** that gives AI assistants code analysis, JSON repair, encoding fix, import organization, format conversion, file diff, and regex testing capabilities.
 
-**15 tools** optimized for developers - the coding companion to [FileCommander](https://github.com/lukisch/bach-filecommander-mcp).
+**17 tools** optimized for developers - the coding companion to [FileCommander](https://github.com/lukisch/bach-filecommander-mcp).
 
 ---
 
@@ -19,7 +19,9 @@ While FileCommander handles filesystem operations, CodeCommander focuses on **co
 - **Import Organization** - Sort and deduplicate Python imports per PEP 8
 - **Encoding Fix** - Repair Mojibake and double-encoded UTF-8 (27+ patterns)
 - **Umlaut Repair** - Fix broken German characters (70+ patterns)
-- **Format Conversion** - Convert between JSON, CSV, and INI
+- **Format Conversion** - Convert between JSON, CSV, INI, YAML, TOML, XML, and TOON
+- **File Diff** - Compare two files with unified diff output (LCS algorithm)
+- **Regex Tester** - Test regular expressions with match details, groups, and replace preview
 - **Markdown Export** - Convert Markdown to professional HTML/PDF with code blocks, tables, nested lists, blockquotes
 - **Cross-platform** - Works on Windows, macOS, and Linux
 
@@ -143,8 +145,15 @@ FileCommander and CodeCommander are designed to work side by side:
 
 | Tool | Description |
 |------|-------------|
-| `cc_convert_format` | Convert between JSON, CSV, and INI formats |
+| `cc_convert_format` | Convert between JSON, CSV, INI, YAML, TOML, XML, and TOON formats |
 | `cc_generate_licenses` | Generate third-party license file (npm/pip) |
+
+### Developer Utilities (2 tools)
+
+| Tool | Description |
+|------|-------------|
+| `cc_diff_files` | Compare two files with unified diff output (configurable context lines) |
+| `cc_regex_test` | Test regex patterns against text/files with match details, groups, and replace preview |
 
 ### Export (2 tools)
 
@@ -153,7 +162,7 @@ FileCommander and CodeCommander are designed to work side by side:
 | `cc_md_to_html` | Markdown to standalone HTML with CSS styling (headers, code blocks, tables, nested lists, blockquotes, images, checkboxes) |
 | `cc_md_to_pdf` | Markdown to PDF via headless browser (Edge/Chrome). Falls back to HTML if no browser is available |
 
-**Total: 15 tools**
+**Total: 17 tools**
 
 ---
 
@@ -167,7 +176,7 @@ FileCommander and CodeCommander are designed to work side by side:
 | `fc_validate_json` | `cc_validate_json` | JSON validation |
 | `fc_fix_encoding` | `cc_fix_encoding` | Encoding repair |
 | `fc_cleanup_file` | `cc_cleanup_file` | File cleanup |
-| `fc_convert_format` | `cc_convert_format` | Format conversion |
+| `fc_convert_format` | `cc_convert_format` | Format conversion (JSON/CSV/INI/YAML/TOML/XML/TOON) |
 | `fc_md_to_html` | `cc_md_to_html` | Markdown to HTML export |
 | `fc_md_to_pdf` | `cc_md_to_pdf` | Markdown to PDF export |
 
