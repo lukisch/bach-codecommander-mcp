@@ -1,0 +1,22 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.lukisch/bach-codecommander-mcp",
+  "version": "1.2.1",
+  "title": "BACH CodeCommander",
+  "description": "15 tools for code analysis, JSON repair, encoding fix, import organization, and PDF export.",
+  "websiteUrl": "https://github.com/lukisch/bach-codecommander-mcp",
+  "repository": {
+    "url": "https://github.com/lukisch/bach-codecommander-mcp",
+    "source": "github",
+    "id": "lukisch/bach-codecommander-mcp"
+  },
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "bach-codecommander-mcp",
+      "version": "1.2.1",
+      "transport": { "type": "stdio" },
+      "runtimeHint": "npx"
+    }
+  ]
+}
