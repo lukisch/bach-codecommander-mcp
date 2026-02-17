@@ -177,8 +177,8 @@ export const en: Translations = {
     labelPackages: 'Packages',
   },
 
-  // === Tool 14: cc_md_to_pdf ===
-  cc_md_to_pdf: {
+  // === Tool 14: cc_md_to_html ===
+  cc_md_to_html: {
     conversionHeader: (filename) => `\u2705 **Markdown \u2192 HTML: ${filename}**`,
     labelSource: 'Source',
     labelTarget: 'Target',
@@ -186,7 +186,17 @@ export const en: Translations = {
     hintPrint: `\uD83D\uDCA1 Open the HTML file in a browser and print as PDF.`,
   },
 
-  // === Tool 15: cc_set_language ===
+  // === Tool 15: cc_md_to_pdf ===
+  cc_md_to_pdf: {
+    conversionHeader: (filename) => `\u2705 **Markdown \u2192 PDF: ${filename}**`,
+    labelSource: 'Source',
+    labelTarget: 'Target',
+    labelSize: 'Size',
+    noBrowser: 'No browser (Edge/Chrome) found. HTML file was created instead.',
+    browserUsed: (name) => `PDF created with ${name}`,
+  },
+
+  // === Tool 16: cc_set_language ===
   cc_set_language: {
     languageSet: (lang) => `Language set to: ${lang}`,
   },

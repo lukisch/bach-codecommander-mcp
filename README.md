@@ -6,7 +6,7 @@
 
 A developer-focused **Model Context Protocol (MCP) server** that gives AI assistants code analysis, JSON repair, encoding fix, import organization, and format conversion capabilities.
 
-**14 tools** optimized for developers - the coding companion to [FileCommander](https://github.com/lukisch/bach-filecommander-mcp).
+**15 tools** optimized for developers - the coding companion to [FileCommander](https://github.com/lukisch/bach-filecommander-mcp).
 
 ---
 
@@ -146,19 +146,20 @@ FileCommander and CodeCommander are designed to work side by side:
 | `cc_convert_format` | Convert between JSON, CSV, and INI formats |
 | `cc_generate_licenses` | Generate third-party license file (npm/pip) |
 
-### Export (1 tool)
+### Export (2 tools)
 
 | Tool | Description |
 |------|-------------|
-| `cc_md_to_pdf` | Markdown to HTML: headers, code blocks, tables, nested lists, blockquotes, images, checkboxes |
+| `cc_md_to_html` | Markdown to standalone HTML with CSS styling (headers, code blocks, tables, nested lists, blockquotes, images, checkboxes) |
+| `cc_md_to_pdf` | Markdown to PDF via headless browser (Edge/Chrome). Falls back to HTML if no browser is available |
 
-**Total: 14 tools**
+**Total: 15 tools**
 
 ---
 
 ## Shared Tools
 
-6 tools exist in both FileCommander and CodeCommander for convenience:
+7 tools exist in both FileCommander and CodeCommander for convenience:
 
 | FileCommander | CodeCommander | Function |
 |---------------|---------------|----------|
@@ -167,7 +168,8 @@ FileCommander and CodeCommander are designed to work side by side:
 | `fc_fix_encoding` | `cc_fix_encoding` | Encoding repair |
 | `fc_cleanup_file` | `cc_cleanup_file` | File cleanup |
 | `fc_convert_format` | `cc_convert_format` | Format conversion |
-| `fc_md_to_html` | `cc_md_to_pdf` | Markdown to HTML export |
+| `fc_md_to_html` | `cc_md_to_html` | Markdown to HTML export |
+| `fc_md_to_pdf` | `cc_md_to_pdf` | Markdown to PDF export |
 
 ---
 

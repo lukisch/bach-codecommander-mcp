@@ -177,8 +177,8 @@ export const de: Translations = {
     labelPackages: 'Pakete',
   },
 
-  // === Tool 14: cc_md_to_pdf ===
-  cc_md_to_pdf: {
+  // === Tool 14: cc_md_to_html ===
+  cc_md_to_html: {
     conversionHeader: (filename) => `\u2705 **Markdown \u2192 HTML: ${filename}**`,
     labelSource: 'Quelle',
     labelTarget: 'Ziel',
@@ -186,7 +186,17 @@ export const de: Translations = {
     hintPrint: `\uD83D\uDCA1 Oeffne die HTML-Datei im Browser und drucke als PDF.`,
   },
 
-  // === Tool 15: cc_set_language ===
+  // === Tool 15: cc_md_to_pdf ===
+  cc_md_to_pdf: {
+    conversionHeader: (filename) => `\u2705 **Markdown \u2192 PDF: ${filename}**`,
+    labelSource: 'Quelle',
+    labelTarget: 'Ziel',
+    labelSize: 'Groesse',
+    noBrowser: 'Kein Browser (Edge/Chrome) gefunden. HTML-Datei wurde stattdessen erstellt.',
+    browserUsed: (name) => `PDF erstellt mit ${name}`,
+  },
+
+  // === Tool 16: cc_set_language ===
   cc_set_language: {
     languageSet: (lang) => `Sprache gesetzt auf: ${lang}`,
   },

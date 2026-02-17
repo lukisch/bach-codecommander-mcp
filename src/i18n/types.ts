@@ -172,8 +172,8 @@ export interface Translations {
     labelPackages: string;
   };
 
-  // === Tool 14: cc_md_to_pdf ===
-  cc_md_to_pdf: {
+  // === Tool 14: cc_md_to_html ===
+  cc_md_to_html: {
     conversionHeader: (filename: string) => string;
     labelSource: string;
     labelTarget: string;
@@ -181,7 +181,17 @@ export interface Translations {
     hintPrint: string;
   };
 
-  // === Tool 15: cc_set_language ===
+  // === Tool 15: cc_md_to_pdf ===
+  cc_md_to_pdf: {
+    conversionHeader: (filename: string) => string;
+    labelSource: string;
+    labelTarget: string;
+    labelSize: string;
+    noBrowser: string;
+    browserUsed: (name: string) => string;
+  };
+
+  // === Tool 16: cc_set_language ===
   cc_set_language: {
     languageSet: (lang: string) => string;
   };
