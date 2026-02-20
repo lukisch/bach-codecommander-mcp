@@ -14,6 +14,8 @@ BACH CodeCommander MCP Server is a developer tool that analyzes and modifies sou
 | `cc_fix_encoding` | Modifies files | Changes file encoding |
 | `cc_cleanup_file` | Modifies files | Removes whitespace/BOM/NUL |
 | `cc_fix_umlauts` | Modifies files | Replaces character sequences |
+| `cc_convert_format` | Creates files | Converts between formats |
+| `cc_md_to_html` | Creates files | Generates HTML output |
 | `cc_md_to_pdf` | Creates files | Generates PDF output |
 
 ### Low Risk Tools (Read-Only)
@@ -26,7 +28,9 @@ BACH CodeCommander MCP Server is a developer tool that analyzes and modifies sou
 | `cc_validate_json` | Reads and validates JSON |
 | `cc_scan_emoji` | Reads and scans for emojis |
 | `cc_generate_licenses` | Reads installed packages |
-| `cc_convert_format` | Reads input, writes output |
+| `cc_diff_files` | Compares two files (read-only) |
+| `cc_regex_test` | Tests regex patterns |
+| `cc_set_language` | Switches output language |
 
 ## Recommendations
 

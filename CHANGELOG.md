@@ -2,6 +2,48 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-02-17
+
+### Changed
+- Replace custom TOON parser/serializer with official `@toon-format/toon` package
+- Proper TOON format: `key: value` syntax instead of custom `key = value`
+
+## [1.3.0] - 2026-02-17
+
+### Added
+- `cc_diff_files` - Compare two files with unified diff output (LCS algorithm, configurable context lines)
+- `cc_regex_test` - Test regex patterns against text/files with match details, groups, and replace preview
+- Expand `cc_convert_format`: add YAML, TOML, XML, and TOON support (was JSON/CSV/INI only)
+- Full i18n (DE/EN) for all new tools
+- Total tools: 17
+
+## [1.2.1] - 2026-02-17
+
+### Added
+- `mcpName` field in package.json for MCP Registry verification
+- `server.json` for official MCP Registry publishing
+
+## [1.2.0] - 2026-02-17
+
+### Changed
+- Rename `cc_md_to_pdf` to `cc_md_to_html` (was generating HTML, not PDF)
+
+### Added
+- `cc_md_to_pdf` - Real PDF generation via headless Edge/Chrome browser
+- Cross-platform browser detection (Windows, macOS, Linux)
+- Fallback to HTML output if no browser is available
+- Total tools: 15
+
+## [1.1.0] - 2026-02-15
+
+### Added
+- Complete internationalization (i18n) infrastructure with German (default) and English support
+- New `cc_set_language` tool for runtime language switching
+- `CC_LANGUAGE` environment variable for startup configuration
+- ~170 translated strings (tool titles, descriptions, error messages)
+- i18n test suite (43 tests)
+- Language priority: `cc_set_language` > `CC_LANGUAGE` env > `"de"` default
+
 ## [1.0.1] - 2026-02-14
 
 ### Fixed
