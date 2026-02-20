@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.2] - 2026-02-20
+
+### Fixed
+- Update CHANGELOG with 5 missing version entries (v1.1.0-v1.3.1)
+- Fix server.json version mismatch
+- Update SECURITY.md with missing tools
+
 ## [1.3.1] - 2026-02-17
 
 ### Changed
